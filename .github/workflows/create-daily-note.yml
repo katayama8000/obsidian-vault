@@ -1,0 +1,60 @@
+name: Create Daily Note
+
+on:
+  schedule:
+    # 07:00 JST = 22:00 UTC (previous day)
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-daily-note:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up date and file path (JST)
+        id: vars
+        run: |
+          DATE_JST="$(TZ=Asia/Tokyo date +%F)"
+          FILE_PATH="daily/${DATE_JST}.md"
+          TEMPLATE_PATH="daily/Daily Template.md"
+          echo "date_jst=${DATE_JST}" >> "$GITHUB_OUTPUT"
+          echo "file_path=${FILE_PATH}" >> "$GITHUB_OUTPUT"
+          echo "template_path=${TEMPLATE_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Create daily note if missing
+        run: |
+          if [ ! -f "${{ steps.vars.outputs.file_path }}" ]; then
+            cp "${{ steps.vars.outputs.template_path }}" "${{ steps.vars.outputs.file_path }}"
+
+            DATE_TITLE="# ${{ steps.vars.outputs.date_jst }}"
+            TARGET_FILE="${{ steps.vars.outputs.file_path }}"
+
+            if grep -q '^# ' "$TARGET_FILE"; then
+              sed -i "0,/^# /s|^# .*|${DATE_TITLE}|" "$TARGET_FILE"
+            else
+              {
+                printf '%s\n\n' "$DATE_TITLE"
+                cat "$TARGET_FILE"
+              } > "${TARGET_FILE}.tmp"
+              mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
+            fi
+          fi
+
+      - name: Commit and push if changed
+        run: |
+          if [ -z "$(git status --porcelain -- "${{ steps.vars.outputs.file_path }}")" ]; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${{ steps.vars.outputs.file_path }}"
+          git commit -m "chore: create daily note for ${{ steps.vars.outputs.date_jst }}"
+          git push
