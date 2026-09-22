@@ -29,20 +29,30 @@ jobs:
 
       - name: Create daily note if missing
         run: |
-          if [ ! -f "${{ steps.vars.outputs.file_path }}" ]; then
-            cp "${{ steps.vars.outputs.template_path }}" "${{ steps.vars.outputs.file_path }}"
+          # Ensure the daily directory exists
+          mkdir -p daily
 
-            DATE_TITLE="# ${{ steps.vars.outputs.date_jst }}"
-            TARGET_FILE="${{ steps.vars.outputs.file_path }}"
+          FILE="${{ steps.vars.outputs.file_path }}"
+          TEMPLATE="${{ steps.vars.outputs.template_path }}"
+          DATE_TITLE="# ${{ steps.vars.outputs.date_jst }}"
 
-            if grep -q '^# ' "$TARGET_FILE"; then
-              sed -i "0,/^# /s|^# .*|${DATE_TITLE}|" "$TARGET_FILE"
+          if [ ! -f "$FILE" ]; then
+            # Copy template if it exists, otherwise create an empty file
+            if [ -f "$TEMPLATE" ]; then
+              cp "$TEMPLATE" "$FILE"
+            else
+              touch "$FILE"
+            fi
+
+            # Replace the first heading (# ) or prepend it if none exists
+            if grep -q '^# ' "$FILE"; then
+              sed -i "0,/^# /s|^# .*|${DATE_TITLE}|" "$FILE"
             else
               {
                 printf '%s\n\n' "$DATE_TITLE"
-                cat "$TARGET_FILE"
-              } > "${TARGET_FILE}.tmp"
-              mv "${TARGET_FILE}.tmp" "$TARGET_FILE"
+                cat "$FILE"
+              } > "${FILE}.tmp"
+              mv "${FILE}.tmp" "$FILE"
             fi
           fi
 
