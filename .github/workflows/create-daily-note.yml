@@ -34,7 +34,7 @@ jobs:
 
           FILE="${{ steps.vars.outputs.file_path }}"
           TEMPLATE="${{ steps.vars.outputs.template_path }}"
-          DATE_TITLE="# ${{ steps.vars.outputs.date_jst }}"
+          DATE_JST="${{ steps.vars.outputs.date_jst }}"
 
           if [ ! -f "$FILE" ]; then
             # Copy template if it exists, otherwise create an empty file
@@ -44,15 +44,11 @@ jobs:
               touch "$FILE"
             fi
 
-            # Set the note title to the date.
-            if grep -q '^# ' "$FILE"; then
-              sed -i "0,/^# /s|^# .*|${DATE_TITLE}|" "$FILE"
-            else
-              {
-                printf '%s\n\n' "$DATE_TITLE"
-                cat "$FILE"
-              } > "${FILE}.tmp"
+            # If the first line is the same date title as the filename, remove it to avoid duplicate titles in Obsidian.
+            if head -n 1 "$FILE" | grep -qx "# ${DATE_JST}"; then
+              tail -n +2 "$FILE" > "${FILE}.tmp"
               mv "${FILE}.tmp" "$FILE"
+              sed -i '1{/^$/d;}' "$FILE"
             fi
           fi
 
